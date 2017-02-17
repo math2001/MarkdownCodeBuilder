@@ -7,6 +7,39 @@ import tempfile
 from .functions import *
 
 MARKDOWN_CODE_BUILDER_FILE = os.path.join(tempfile.gettempdir(), 'MarkdownCodeBuilder')
+STYLE = """\
+html {
+  margin: 0;
+  padding: 0;
+}
+
+#MarkdownCodeBuilder {
+  background-color: var(--background);
+  color: var(--foreground);
+  margin: 0;
+  padding: 0;
+}
+
+#MarkdownCodeBuilder a {
+  text-decoration: none;
+  color: var(--background);
+}
+
+.label {
+  border-radius: 3px;
+  color: var(--background);
+  background-color: var(--foreground);
+  padding: 0 5px;
+}
+"""
+HTML = """\
+<body id="MarkdownCodeBuilder" class="miniui">
+<style>
+{css}
+</style>
+{link}
+</body>
+"""
 
 class MarkdownCodeBuilderCommand(sublime_plugin.TextCommand):
 
@@ -37,7 +70,8 @@ class MarkdownCodeBuilderCommand(sublime_plugin.TextCommand):
 
     def on_navigate(self, href):
         v = self.view
-        phantom_index, scope, executable = href.split('-', 2)
+        phantom_index, scope, executable, fresh = href.split('-', 3)
+        fresh = fresh == 'fresh'
         phantom_region = self.phantom_set.phantoms[int(phantom_index)].region
         for region in v.find_by_selector('markup.raw.block.markdown'):
             if not region.contains(phantom_region):
@@ -65,11 +99,12 @@ class MarkdownCodeBuilderCommand(sublime_plugin.TextCommand):
             executable = self._get_executable(scope)
             if not executable:
                 continue
-            phantoms.append(sublime.Phantom(sublime.Region(code_block.end() - 1),
-                                            '<a href="{}-{}-{}">Build</a>'.format(i, scope,
-                                                                                  executable),
-                                            sublime.LAYOUT_INLINE,
-                                            self.on_navigate))
+            link = '<span class="label"><a href="{0}-{1}-{2}-fresh">►</a> <a href="{0}-{1}-{2}-continuation">➤</a></span>'.format(i,
+                                                                                  scope, executable)
+            phantoms.append(
+                sublime.Phantom(sublime.Region(code_block.end() - 1),
+                                HTML.format(link=link, css=STYLE),
+                                sublime.LAYOUT_INLINE, self.on_navigate))
             i += 1
         self.phantom_set.update(phantoms)
 
